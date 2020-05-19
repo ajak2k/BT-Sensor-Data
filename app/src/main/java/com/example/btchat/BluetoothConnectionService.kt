@@ -1,4 +1,6 @@
-@file:Suppress("DEPRECATION", "UNUSED_PARAMETER", "ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+@file:Suppress("DEPRECATION", "UNUSED_PARAMETER", "ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE",
+    "UNUSED_VARIABLE", "unused"
+)
 
 package com.example.btchat
 
@@ -9,6 +11,10 @@ import android.bluetooth.BluetoothServerSocket
 import android.bluetooth.BluetoothSocket
 import android.content.Context
 import android.util.Log
+import java.io.IOException
+import java.io.InputStream
+import java.io.OutputStream
+import java.nio.charset.Charset
 import java.util.*
 
 private const val TAG = "BluetoothConnectionServ"
@@ -20,13 +26,14 @@ private val MY_UUID_INSECURE : UUID = UUID.fromString("8ce255c0-200a-11e0-ac64-0
 class BluetoothConnectionService (context: Context){
 
     private var mBluetoothAdapter : BluetoothAdapter? = null
-    var mContext: Context? = null
-
-    private var mInsecureAcceptThread: AcceptThread? = null
-    private var mConnectThread: ConnectThread? = null
+    private var mContext: Context? = null
     private var mmDevice: BluetoothDevice? = null
     private var deviceUUID: UUID? = null
     var mProgressDialog: ProgressDialog? = null
+
+    private var mInsecureAcceptThread: AcceptThread? = null
+    private var mConnectThread: ConnectThread? = null
+    private var mConnectedThread: ConnectedThread? = null
 
     //Constructor for the BluetoothConnectionService class
     init {
@@ -101,13 +108,80 @@ class BluetoothConnectionService (context: Context){
         }
     }
 
+    /**
+     * The ConnectedThread is responsible for maintaining the BTConnection, Sending the data, and
+     * receiving incoming data through input/output streams respectively.
+     */
+    private inner class ConnectedThread(socket: BluetoothSocket?): Thread(){
+
+        private var mmSocket : BluetoothSocket? = null
+        private var mmInStream: InputStream? =null
+        private var mmOutStream: OutputStream? =null
+
+        init{
+            Log.d(TAG,"ConnectedThread: Starting")
+            //At the point of execution of this code, the connection is definitely established
+            //So we don't need the dialogue box anymore
+            mProgressDialog?.dismiss()
+
+            mmSocket=socket
+            mmInStream = mmSocket?.inputStream
+            mmOutStream = mmSocket?.outputStream
+        }
+
+        override fun run() {
+            val buffer = ByteArray(1024)//buffer captures the data sent over
+            var bytes : Int                 //It holds the number of bytes received
+
+            //Keep Listening to the InputStream until an exception occurs
+            while (true){
+                try {
+                    bytes = mmInStream!!.read(buffer)
+                    val incomingMessage = String(buffer,0,bytes)
+                    Log.d(TAG,"InputStream: $incomingMessage")
+                } catch (e: IOException){
+                    Log.e(TAG,"write: Error reading Input Stream. " + e.message)
+                    break
+                }
+            }
+        }
+
+        //Call this from the MainActivity to send data to the remote device
+        fun write(bytes: ByteArray){
+            val text = String(bytes, Charset.defaultCharset())
+            Log.d(TAG,"write: Writing to Output Stream: $text ")
+            try {
+                mmOutStream?.write(bytes)
+            } catch (e: IOException){
+                Log.e(TAG,"write: Error writing to Output Stream. " + e.message)
+            }
+        }
+
+        //Call this from the MainActivity to shutdown the connection
+        fun cancel(){
+            mmSocket?.close()
+        }
+    }
 
     //Methods for the class BluetoothConnectionService
 
+    //Private methods for internal usage
+    /**
+     * Starts the Connected Thread to manage the connection and the transmission
+     */
+    private fun connected(mmSocket: BluetoothSocket?, mmDevice: BluetoothDevice?) {
+        Log.d(TAG, "connected: Starting.")
+        // Start the thread to manage the connection and perform transmissions
+        mConnectedThread = ConnectedThread(mmSocket)
+        mConnectedThread!!.start()
+    }
+
+    //Public Method for external usage
     /**
      * Start the chat service. Specifically start AcceptThread to begin a
      * session in listening (server) mode. Called by the Activity onResume()
      */
+    @Synchronized
     private fun start() {
         Log.d(TAG, "start")
 
@@ -115,6 +189,7 @@ class BluetoothConnectionService (context: Context){
         if (mConnectThread != null) {mConnectThread?.cancel(); mConnectThread = null}
         if (mInsecureAcceptThread == null) {mInsecureAcceptThread = AcceptThread(); mInsecureAcceptThread!!.start()}
     }
+
     /**
      * AcceptThread starts and sits waiting for a connection.
      * Then ConnectThread starts and attempts to make a connection with the other devices AcceptThread.
@@ -129,7 +204,18 @@ class BluetoothConnectionService (context: Context){
         mConnectThread?.start()
     }
 
-    private fun connected(mmSocket: BluetoothSocket?,mmDevice: BluetoothDevice?) {
-        //TODO("Not yet implemented")
+    /**
+     * Write to the ConnectedThread in an unsynchronized manner
+     *
+     * Parameters: 'out' - The bytes to write
+     * See ConnectedThread.write for more details
+     */
+    fun write(out: ByteArray?) {
+
+        var r: ConnectedThread
+        // Synchronize a copy of the ConnectedThread
+        Log.d(TAG, "write: Write Called.")
+        mConnectedThread!!.write(out!!)
     }
+
 }
