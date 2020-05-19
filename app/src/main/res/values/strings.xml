@@ -1,3 +1,9 @@
 <resources>
     <string name="app_name">BTchat</string>
+    <string name="click_on_the_device_to_pair">Click On the Device to Pair</string>
+    <string name="connection_controls">Connection Controls</string>
+    <string name="device_controls">Device Controls</string>
+    <string name="bt_chat_application">BT_Chat_Application</string>
+    <string name="on_off">On/Off</string>
+    <string name="enable_discoverability">Enable Discoverability</string>
 </resources>
