@@ -1,5 +1,5 @@
 # BTchat
-The Procdure to use the application to send and receive messages:
+The Procedure to use the application to send and receive messages:
 
 1. Turn on Location on your phone
 2. Launch the Application
