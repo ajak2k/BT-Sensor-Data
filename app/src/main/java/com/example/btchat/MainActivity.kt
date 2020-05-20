@@ -1,4 +1,6 @@
-@file:Suppress("LocalVariableName", "UNUSED_PARAMETER")
+@file:Suppress("LocalVariableName", "UNUSED_PARAMETER", "unused",
+    "NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS"
+)
 
 package com.example.btchat
 
@@ -15,23 +17,33 @@ import android.os.Build.VERSION_CODES.M
 import android.os.Bundle
 import android.util.Log
 import android.view.View
-import android.widget.AdapterView
-import android.widget.Button
-import android.widget.ListView
+import android.widget.*
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.example.user.bluetooth_discoverdevices.DeviceListAdapter
+import java.lang.StringBuilder
+import java.nio.charset.Charset
+import java.util.*
+import kotlin.collections.ArrayList
 
 
 private const val TAG = "MyActivity"
+private val MY_UUID_INSECURE : UUID = UUID.fromString("8ce255c0-200a-11e0-ac64-0800200c9a66")
 
 
 class MainActivity : AppCompatActivity(), AdapterView.OnItemClickListener {
 
     private var mBluetoothAdapter   : BluetoothAdapter? = null
+    private var mBluetoothConnection: BluetoothConnectionService? =null
+    var mBTDevice: BluetoothDevice? = null
     var mBTDevices: ArrayList<BluetoothDevice?> = ArrayList()
+
     var mDeviceListAdapter: DeviceListAdapter? = null
     var lvNewDevices: ListView? = null
+
+    var incomingMessages: TextView? =null   //This is for displaying the incoming messages on the screen
+    var messages: StringBuilder? = null //This is for appending the incoming messages and posting them on the text view
 
     /**
      * The BroadCastReceivers are used to listen to the various state changes that happen
@@ -90,15 +102,17 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemClickListener {
         override fun onReceive(context: Context?, intent: Intent?) {
             val action = intent!!.action
 
-            if(action.equals(BluetoothDevice.ACTION_BOND_STATE_CHANGED))
-            {
-                val mDevice: BluetoothDevice? = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+            if(action.equals(BluetoothDevice.ACTION_BOND_STATE_CHANGED)) {
+                val mDevice: BluetoothDevice? =
+                    intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
 
                 //3 Cases:
 
                 //Case1: bonded already
-                if(mDevice?.bondState == BluetoothDevice.BOND_BONDED)
+                if (mDevice?.bondState == BluetoothDevice.BOND_BONDED){
                     Log.d(TAG, "BroadcastReceiver: BOND_BONDED.")
+                    mBTDevice = mDevice
+                }
                 //Case2: creating a bond
                 if(mDevice?.bondState == BluetoothDevice.BOND_BONDING)
                     Log.d(TAG, "BroadcastReceiver: BOND_BONDING.")
@@ -108,7 +122,15 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemClickListener {
             }
         }
     }
+    //Listens for the incomingMessage and prints it in the textView
+    private val mReceiver: BroadcastReceiver = object: BroadcastReceiver(){
+        override fun onReceive(context: Context?, intent: Intent) {
+            val text: String = intent.getStringExtra("theMessage")
 
+            messages?.append("$text \n")
+            incomingMessages?.text = messages
+        }
+    }
     /**
      * The OnCreate and OnDestroy methods are the methods that will be executed on the creation of
      * the activity and the destruction of the activity respectively
@@ -116,10 +138,20 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemClickListener {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         this.setContentView(R.layout.activity_main)
+
         val btnONOFF = this.findViewById<Button>(R.id.btnONOFF)
+        val btnStartConnection: Button = this.findViewById<Button>(R.id.btnStartConnection)
+        val btnSend: Button = this.findViewById<Button>(R.id.btnSend)
+
+        val etSend: EditText = this.findViewById(R.id.editText)
 
         lvNewDevices = findViewById(R.id.lvNewDevices)
         mBTDevices = ArrayList()
+
+        incomingMessages = findViewById(R.id.incomingMessages)
+        messages = StringBuilder()
+
+        LocalBroadcastManager.getInstance(this).registerReceiver(mReceiver, IntentFilter("incomingMessage"))
 
         val filter = IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED)
         registerReceiver(mBroadcastReceiver4,filter)
@@ -131,6 +163,18 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemClickListener {
         {
             this.enableDisableBT()
         }
+
+        btnStartConnection.setOnClickListener()
+        {
+                startConnection()
+        }
+
+        btnSend.setOnClickListener()
+        {
+                val bytes: ByteArray = etSend.text.toString().toByteArray(Charset.defaultCharset())
+                mBluetoothConnection?.write(bytes)
+                etSend.setText("")
+        }
     }
 
     override fun onDestroy() {
@@ -140,6 +184,7 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemClickListener {
         this.unregisterReceiver(this.mBroadcastReceiver2)
         this.unregisterReceiver(this.mBroadcastReceiver3)
         this.unregisterReceiver(this.mBroadcastReceiver4)
+        this.unregisterReceiver(this.mReceiver)
     }
 
     /**
@@ -168,7 +213,8 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemClickListener {
             this.registerReceiver(this.mBroadcastReceiver1, BTIntent)
         }
     }
-   //Used to make the device discoverable to other devices for 300 seconds
+
+    //Used to make the device discoverable to other devices for 300 seconds
     fun btnEnableDisableDiscoverable(view: View) {
         Log.d(TAG,"btnEnableDisableDiscoverable: Making device discoverable for 300 seconds.")
         val discoverableIntent = Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE)
@@ -177,6 +223,7 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemClickListener {
         val intentFilter = IntentFilter(BluetoothAdapter.ACTION_SCAN_MODE_CHANGED)
         registerReceiver(mBroadcastReceiver2, intentFilter)
     }
+
     //Used to Scan and Discover other discoverable devices
     fun btnDiscover(view: View) {
         Log.d(TAG, "btnDiscover: Looking for unpaired devices.")
@@ -204,6 +251,18 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemClickListener {
             registerReceiver(mBroadcastReceiver3, discoverDevicesIntent)
         }
     }
+
+    //Remember the connection will fail and app will crash if you haven't paired first
+    fun startConnection()
+    {
+        startBTConnection(this.mBTDevice, MY_UUID_INSECURE)
+    }
+    //Starting chat service method
+    private fun startBTConnection(device: BluetoothDevice?, uuid: UUID?) {
+        Log.d(TAG,"startBTConnection: Initializing RFCOM Bluetooth Connection.")
+        mBluetoothConnection?.startClient(device, uuid)
+    }
+
     //Used to initiate a bond with the device that has been selected in the DeviceListAdapter
     override fun onItemClick(adapterView: AdapterView<*>?, view: View, i: Int, l: Long) {
         //first cancel discovery because its very memory intensive.
@@ -218,8 +277,12 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemClickListener {
 
         //create the bond.
         Log.d(TAG, "Trying to pair with $deviceName")
-        mBTDevices[i]?.createBond()
+        mBTDevice = mBTDevices[i]
+        mBTDevice?.createBond()
+        Log.d(TAG, "Bond Created")
+        mBluetoothConnection = BluetoothConnectionService(this@MainActivity)
     }
+
     //Used to check if all the Permissions needed for the application to run smoothly is available
     @RequiresApi(M)
     private fun checkBTPermissions() {

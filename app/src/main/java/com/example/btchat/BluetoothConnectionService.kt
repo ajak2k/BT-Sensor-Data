@@ -10,7 +10,9 @@ import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothServerSocket
 import android.bluetooth.BluetoothSocket
 import android.content.Context
+import android.content.Intent
 import android.util.Log
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
@@ -26,11 +28,11 @@ private val MY_UUID_INSECURE : UUID = UUID.fromString("8ce255c0-200a-11e0-ac64-0
 class BluetoothConnectionService (context: Context){
 
     private var mBluetoothAdapter : BluetoothAdapter? = null
-    private var mContext: Context? = null
+
     private var mmDevice: BluetoothDevice? = null
     private var deviceUUID: UUID? = null
     var mProgressDialog: ProgressDialog? = null
-
+    private var mContext: Context? = null
     private var mInsecureAcceptThread: AcceptThread? = null
     private var mConnectThread: ConnectThread? = null
     private var mConnectedThread: ConnectedThread? = null
@@ -62,9 +64,13 @@ class BluetoothConnectionService (context: Context){
             // This .accept() a blocking call and will only return on a
             // successful connection or an exception
             Log.d(TAG, "run: RFCOM server socket start.....")
-            var socket = mmServerSocket?.accept()
+            val socket = mmServerSocket?.accept()
             Log.d(TAG,"RFCOM Server socket accepted connection")
+
+            if (socket != null)
+                connected(socket,mmDevice)
         }
+
         fun cancel(){
             Log.d(TAG,"cancel: Cancelling AcceptThread")
             mmServerSocket?.close()
@@ -122,8 +128,11 @@ class BluetoothConnectionService (context: Context){
             Log.d(TAG,"ConnectedThread: Starting")
             //At the point of execution of this code, the connection is definitely established
             //So we don't need the dialogue box anymore
-            mProgressDialog?.dismiss()
-
+            try {
+                mProgressDialog?.dismiss()
+            }catch (e: NullPointerException){
+                e.printStackTrace()
+            }
             mmSocket=socket
             mmInStream = mmSocket?.inputStream
             mmOutStream = mmSocket?.outputStream
@@ -139,6 +148,12 @@ class BluetoothConnectionService (context: Context){
                     bytes = mmInStream!!.read(buffer)
                     val incomingMessage = String(buffer,0,bytes)
                     Log.d(TAG,"InputStream: $incomingMessage")
+
+                    val incomingMessageIntent = Intent("incomingMessage")
+                    incomingMessageIntent.putExtra("theMessage", incomingMessage)
+                    mContext?.let {LocalBroadcastManager.getInstance(it).sendBroadcast(incomingMessageIntent)}
+                    Log.d(TAG,"Intent Broadcast Done")
+
                 } catch (e: IOException){
                     Log.e(TAG,"write: Error reading Input Stream. " + e.message)
                     break
@@ -187,7 +202,10 @@ class BluetoothConnectionService (context: Context){
 
         // Cancel any thread attempting to make a connection
         if (mConnectThread != null) {mConnectThread?.cancel(); mConnectThread = null}
-        if (mInsecureAcceptThread == null) {mInsecureAcceptThread = AcceptThread(); mInsecureAcceptThread!!.start()}
+        if (mInsecureAcceptThread == null) {
+            mInsecureAcceptThread = AcceptThread()
+            mInsecureAcceptThread!!.start()
+        }
     }
 
     /**
