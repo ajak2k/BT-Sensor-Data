@@ -1,6 +1,6 @@
 @file:Suppress("JoinDeclarationAndAssignment")
 
-package com.example.user.bluetooth_discoverdevices
+package com.example.btchat
 
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice

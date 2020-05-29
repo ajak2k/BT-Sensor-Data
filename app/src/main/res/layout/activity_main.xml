@@ -7,6 +7,16 @@
     android:background="#100F0F"
     tools:context="com.example.btchat.MainActivity">
 
+    <Button
+        android:id="@+id/btnStopSensors"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="164dp"
+        android:layout_marginTop="19dp"
+        android:text="@string/stop_sensors"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/lvNewDevices" />
+
     <TextView
         android:id="@+id/textView6"
         android:layout_width="wrap_content"
@@ -32,9 +42,20 @@
         android:id="@+id/textView2"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="20dp"
+        android:layout_marginStart="16dp"
         android:layout_marginTop="12dp"
         android:text="@string/connection_controls"
+        android:textColor="#FFD3CDCD"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/btnDiscoverable_on_off" />
+
+    <TextView
+        android:id="@+id/textView5"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="176dp"
+        android:text="@string/sensor_controls"
         android:textColor="#FFD3CDCD"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/btnDiscoverable_on_off" />
@@ -99,13 +120,15 @@
     <ListView
         android:id="@+id/lvNewDevices"
         style="@android:style/Widget.DeviceDefault.ExpandableListView"
-        android:layout_width="218dp"
+        android:layout_width="0dp"
         android:layout_height="149dp"
         android:layout_below="@id/btnFindUnpairedDevices"
+        android:layout_marginStart="2dp"
         android:layout_marginEnd="15dp"
         android:background="#98766A6A"
         android:cacheColorHint="#93000000"
         app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@+id/btnStartConnection"
         app:layout_constraintTop_toBottomOf="@+id/textView3" />
 
     <Button
@@ -114,7 +137,6 @@
         android:layout_height="wrap_content"
         android:layout_below="@+id/btnFindUnpairedDevices"
         android:layout_marginStart="16dp"
-        android:layout_marginTop="19dp"
         android:text="@string/start_connection"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/btnFindUnpairedDevices" />
@@ -126,11 +148,13 @@
         android:layout_below="@+id/lvNewDevices"
         android:layout_alignParentStart="true"
         android:layout_marginStart="16dp"
+        android:layout_marginEnd="8dp"
         android:layout_marginBottom="16dp"
         android:background="#98766A6A"
         android:hint="@string/enter_text_here"
         android:textColor="#D3CDCD"
         app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toStartOf="@+id/btnSend"
         app:layout_constraintStart_toStartOf="parent"
         tools:ignore="Autofill,TextFields" />
 
@@ -148,14 +172,33 @@
 
     <TextView
         android:id="@+id/incomingMessages"
-        android:layout_width="379dp"
+        android:layout_width="0dp"
         android:layout_height="135dp"
         android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
         android:layout_marginBottom="14dp"
         android:background="#98766A6A"
+        android:fadeScrollbars="false"
+        android:freezesText="false"
+        android:isScrollContainer="true"
+        android:overScrollMode="ifContentScrolls"
+        android:scrollbarStyle="insideOverlay"
+        android:scrollbars="vertical"
         android:textColor="#D3CDCD"
+        android:verticalScrollbarPosition="defaultPosition"
         app:layout_constraintBottom_toTopOf="@+id/editText"
+        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
+
+    <Button
+        android:id="@+id/btnStartSensors"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="76dp"
+        android:text="@string/start_sensors"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/btnStartConnection" />
 
 
 </androidx.constraintlayout.widget.ConstraintLayout>

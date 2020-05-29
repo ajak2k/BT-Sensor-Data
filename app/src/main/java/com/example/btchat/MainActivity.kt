@@ -4,6 +4,7 @@
 
 package com.example.btchat
 
+import SensorData
 import android.Manifest
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothAdapter.getDefaultAdapter
@@ -12,6 +13,10 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.os.Build
 import android.os.Build.VERSION_CODES.M
 import android.os.Bundle
@@ -21,8 +26,6 @@ import android.widget.*
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
-import com.example.user.bluetooth_discoverdevices.DeviceListAdapter
-import java.lang.StringBuilder
 import java.nio.charset.Charset
 import java.util.*
 import kotlin.collections.ArrayList
@@ -31,11 +34,14 @@ import kotlin.collections.ArrayList
 private const val TAG = "MyActivity"
 private val MY_UUID_INSECURE : UUID = UUID.fromString("8ce255c0-200a-11e0-ac64-0800200c9a66")
 
+const val  SamplingPeriod = 10000 //in Micro Seconds
 
-class MainActivity : AppCompatActivity(), AdapterView.OnItemClickListener {
 
+class MainActivity : AppCompatActivity() , AdapterView.OnItemClickListener, SensorEventListener {
+
+    //Variables required to establish Bluetooth Communication
     private var mBluetoothAdapter   : BluetoothAdapter? = null
-    private var mBluetoothConnection: BluetoothConnectionService? =null
+    var mBluetoothConnection: BluetoothConnectionService? =null
     var mBTDevice: BluetoothDevice? = null
     var mBTDevices: ArrayList<BluetoothDevice?> = ArrayList()
 
@@ -44,6 +50,23 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemClickListener {
 
     var incomingMessages: TextView? =null   //This is for displaying the incoming messages on the screen
     var messages: StringBuilder? = null //This is for appending the incoming messages and posting them on the text view
+
+    // Variables required for the Sensor data acquisition
+    private var mSensorData: SensorData? = null
+    var mSensorManager: SensorManager? = null
+    var mAccelerometer: Sensor? = null
+    var mGyroscope: Sensor? = null
+
+    var x : Float = 0.0F
+    var y : Float = 0.0F
+    var z : Float = 0.0F
+
+    var Wx : Float = 0.0F
+    var Wy : Float = 0.0F
+    var Wz : Float = 0.0F
+
+    var dataFlow : Boolean = false
+
 
     /**
      * The BroadCastReceivers are used to listen to the various state changes that happen
@@ -125,12 +148,16 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemClickListener {
     //Listens for the incomingMessage and prints it in the textView
     private val mReceiver: BroadcastReceiver = object: BroadcastReceiver(){
         override fun onReceive(context: Context?, intent: Intent) {
-            val text: String = intent.getStringExtra("theMessage")
 
-            messages?.append("$text \n")
-            incomingMessages?.text = messages
+            val text: String = intent.getStringExtra("theMessage")
+            incomingMessages?.text = text
+            //messages?.append("$text \n")
+            //incomingMessages?.text = messages
         }
     }
+
+
+
     /**
      * The OnCreate and OnDestroy methods are the methods that will be executed on the creation of
      * the activity and the destruction of the activity respectively
@@ -139,9 +166,12 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemClickListener {
         super.onCreate(savedInstanceState)
         this.setContentView(R.layout.activity_main)
 
-        val btnONOFF = this.findViewById<Button>(R.id.btnONOFF)
-        val btnStartConnection: Button = this.findViewById<Button>(R.id.btnStartConnection)
-        val btnSend: Button = this.findViewById<Button>(R.id.btnSend)
+        val btnONOFF : Button = this.findViewById(R.id.btnONOFF)
+        val btnStartConnection: Button = this.findViewById(R.id.btnStartConnection)
+        val btnSend: Button = this.findViewById(R.id.btnSend)
+
+        val btnStartSensors: Button = this.findViewById(R.id.btnStartSensors)
+        val btnStopSensors: Button = this.findViewById(R.id.btnStopSensors)
 
         val etSend: EditText = this.findViewById(R.id.editText)
 
@@ -152,29 +182,47 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemClickListener {
         messages = StringBuilder()
 
         LocalBroadcastManager.getInstance(this).registerReceiver(mReceiver, IntentFilter("incomingMessage"))
-
         val filter = IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED)
         registerReceiver(mBroadcastReceiver4,filter)
 
         this.mBluetoothAdapter = getDefaultAdapter()
         lvNewDevices!!.onItemClickListener = this@MainActivity
 
-        btnONOFF.setOnClickListener()
-        {
+
+        mSensorManager = this@MainActivity.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        mAccelerometer = mSensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+        mGyroscope = mSensorManager?.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
+
+
+        btnONOFF.setOnClickListener(){
             this.enableDisableBT()
         }
 
-        btnStartConnection.setOnClickListener()
-        {
+        btnStartConnection.setOnClickListener(){
                 startConnection()
         }
 
-        btnSend.setOnClickListener()
-        {
+        btnSend.setOnClickListener(){
                 val bytes: ByteArray = etSend.text.toString().toByteArray(Charset.defaultCharset())
                 mBluetoothConnection?.write(bytes)
                 etSend.setText("")
         }
+
+        btnStartSensors.setOnClickListener(){
+            initListeners()
+            Log.d(TAG, "StartSensor: Initialized Listeners")
+            dataFlow = true
+            Log.d(TAG, "StartSensor: Data Flow Initialized")
+        }
+
+        btnStopSensors.setOnClickListener(){
+            destListeners()
+            Log.d(TAG, "StartSensor: Listeners Destroyed")
+            dataFlow = false
+            Log.d(TAG, "StartSensor: Data Flow Destroyed")
+
+        }
+
     }
 
     override fun onDestroy() {
@@ -185,6 +233,49 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemClickListener {
         this.unregisterReceiver(this.mBroadcastReceiver3)
         this.unregisterReceiver(this.mBroadcastReceiver4)
         this.unregisterReceiver(this.mReceiver)
+        destListeners()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // unregister sensor listeners to prevent the activity from draining the device's battery.
+        destListeners()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        // unregister sensor listeners to prevent the activity from draining the device's battery.
+        destListeners()
+    }
+
+
+
+    override fun onSensorChanged(event: SensorEvent) {
+        Log.d(TAG, "onSensorChanged: Started")
+        when (event.sensor.type) {
+            Sensor.TYPE_ACCELEROMETER -> {
+                x = event.values[0]
+                y = event.values[1]
+                z = event.values[2]
+            }
+            Sensor.TYPE_GYROSCOPE ->     {
+                                            Wx = event.values[0]
+                                            Wy = event.values[1]
+                                            Wz = event.values[2]
+                                         }
+        }
+        if (dataFlow)
+        {
+            val data = "X=$x\t Y=$y\t Z=$z\t Wx=$Wx\t Wy=$Wy\t Wz=$Wz\n"
+            Log.d(TAG, "onSensorChanged: Data: $data")
+            val byte : ByteArray = data.toByteArray(Charset.defaultCharset())
+            mBluetoothConnection?.write(byte)
+            Log.d(TAG, "onSensorChanged: Data Transmitted")
+        }
+    }
+
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
+        Log.d(TAG, "Accuracy Changed")
     }
 
     /**
@@ -195,7 +286,7 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemClickListener {
     private fun enableDisableBT() {
         if(this.mBluetoothAdapter == null)
             Log.d(TAG, "enableDisableBT : Does not have Bluetooth capabililties. ")
-        else if (!this.mBluetoothAdapter!!.isEnabled) {
+        if (!this.mBluetoothAdapter!!.isEnabled) {
 
             Log.d(TAG, "enableDisableBT: enabling BT.")
             val enableBTIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
@@ -253,11 +344,10 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemClickListener {
     }
 
     //Remember the connection will fail and app will crash if you haven't paired first
-    fun startConnection()
-    {
+    private fun startConnection(){
         startBTConnection(this.mBTDevice, MY_UUID_INSECURE)
     }
-    //Starting chat service method
+    //Starting chat service method and initializing the Listeners for Sensors
     private fun startBTConnection(device: BluetoothDevice?, uuid: UUID?) {
         Log.d(TAG,"startBTConnection: Initializing RFCOM Bluetooth Connection.")
         mBluetoothConnection?.startClient(device, uuid)
@@ -295,5 +385,18 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemClickListener {
         } else {
             Log.d(TAG,"checkBTPermissions: No need to check permissions. SDK version < LOLLIPOP.")
         }
+    }
+
+    /**
+     * Sensor Methods
+     */
+
+    private fun initListeners(){
+        mSensorManager?.registerListener(this, mAccelerometer, SensorManager.SENSOR_DELAY_NORMAL) //100Hz sampling rate
+        mSensorManager?.registerListener(this, mGyroscope, SensorManager.SENSOR_DELAY_NORMAL)
+    }
+
+    private fun destListeners(){
+        mSensorManager?.unregisterListener(this)
     }
 }
