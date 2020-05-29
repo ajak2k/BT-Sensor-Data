@@ -1,7 +1,7 @@
 # BTchat
 The Procedure to use the application to send and receive messages:
 
-1. Turn on Location on your phone
+1. Turn on Location on your phone if Android Version>Lollipop:5.1.1
 2. Launch the Application
 3. Turn on Bluetooth
 4. Enable discoverability on both devices
