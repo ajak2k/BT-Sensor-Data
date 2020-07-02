@@ -3,14 +3,22 @@
     <string name="click_on_the_device_to_pair">Click On the Device to Pair</string>
     <string name="connection_controls">Connection Controls</string>
     <string name="device_controls">Device Controls</string>
-    <string name="bt_chat_application">BT_Chat_Application</string>
+    <string name="bt_application">BT_Application</string>
     <string name="on_off">On/Off</string>
     <string name="enable_discoverability">Enable Discoverability</string>
     <string name="send">SEND</string>
     <string name="enter_text_here">Enter Text Here</string>
     <string name="start_connection">Start Connection</string>
-    <string name="incoming_messages">Incoming Messages</string>
+    <string name="incoming_A_Data">Incoming Accelerometer Data</string>
+    <string name="incoming_G_Data">Incoming Gyroscope Data</string>
     <string name="start_sensors">Start Sensors</string>
     <string name="sensor_controls">Sensor Controls</string>
     <string name="stop_sensors">Stop Sensors</string>
+    <string name="device1_data">Device1 Data</string>
+    <string name="device2_data">Device2 Data</string>
+    <string name="device3_data">Device3 Data</string>
+    <string name="receiver">Receiver</string>
+    <string name="transmitter_1">Transmitter 1</string>
+    <string name="transmitter_2">Transmitter 2</string>
+    <string name="transmitter_3">Transmitter 3</string>
 </resources>

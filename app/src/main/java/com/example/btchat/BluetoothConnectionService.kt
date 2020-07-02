@@ -21,11 +21,14 @@ import java.util.*
 
 private const val TAG = "BluetoothConnectionServ"
 private const val appName = "MYAPP"
-private val MY_UUID_INSECURE : UUID = UUID.fromString("8ce255c0-200a-11e0-ac64-0800200c9a66")
+private val MY_UUID_INSECURE_1 : UUID = UUID.fromString("8ce255c0-200a-11e0-ac64-0800200c9a66")
+private val MY_UUID_INSECURE_2 : UUID = UUID.fromString("a2eb3fca-4fe1-489a-935a-43599dd0eb59")
+private val MY_UUID_INSECURE_3 : UUID = UUID.fromString("03bf81b7-a613-459f-b76a-310265378bcf")
+
+private var deviceUUID : UUID? = null
 
 
-
-class BluetoothConnectionService (context: Context){
+class BluetoothConnectionService (context: Context, idNO: Int, uuid: UUID?){
 
     private var mBluetoothAdapter : BluetoothAdapter? = null
 
@@ -33,47 +36,82 @@ class BluetoothConnectionService (context: Context){
     private var deviceUUID: UUID? = null
     var mProgressDialog: ProgressDialog? = null
     private var mContext: Context? = null
+
     private var mInsecureAcceptThread: AcceptThread? = null
+
     private var mConnectThread: ConnectThread? = null
+
     private var mConnectedThread: ConnectedThread? = null
+
+    private var deviceID: Int = 0
 
     //Constructor for the BluetoothConnectionService class
     init {
         mContext = context
         mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
+        deviceID = idNO
+        deviceUUID = uuid
         start()
     }
 
-    //Inner Classes for the
+    //Inner Classes/Threads
     /**
      * This thread runs while listening for incoming connections. It behaves
      * like a server-side client. It runs until a connection is accepted
      * (or until cancelled). This runs in a separate thread to prevent performance issues
      */
     private inner class AcceptThread : Thread(){
-        var mmServerSocket: BluetoothServerSocket? = null
+        var mmServerSocket1: BluetoothServerSocket? = null
+        var mmServerSocket2: BluetoothServerSocket? = null
+        var mmServerSocket3: BluetoothServerSocket? = null
 
         init {
             //create a new listening server socket for other devices to connect to
-            val tmp = mBluetoothAdapter?.listenUsingInsecureRfcommWithServiceRecord(appName, MY_UUID_INSECURE)
-            Log.d(TAG, "AcceptThread: Setting up the Server using $MY_UUID_INSECURE")
-            mmServerSocket = tmp
+            var tmp = mBluetoothAdapter?.listenUsingInsecureRfcommWithServiceRecord(appName, MY_UUID_INSECURE_1)
+            Log.d(TAG, "AcceptThread: Setting up the Server using $deviceUUID")
+            mmServerSocket1 = tmp
+
+            tmp = mBluetoothAdapter?.listenUsingInsecureRfcommWithServiceRecord(appName, MY_UUID_INSECURE_2)
+            Log.d(TAG, "AcceptThread: Setting up the Server using $deviceUUID")
+            mmServerSocket2 = tmp
+
+            tmp = mBluetoothAdapter?.listenUsingInsecureRfcommWithServiceRecord(appName, MY_UUID_INSECURE_3)
+            Log.d(TAG, "AcceptThread: Setting up the Server using $MY_UUID_INSECURE_3")
+            mmServerSocket3 = tmp
+
         }
         override fun run() {
             Log.d(TAG,"run: AcceptThread Running.")
             // This .accept() a blocking call and will only return on a
             // successful connection or an exception
-            Log.d(TAG, "run: RFCOM server socket start.....")
-            val socket = mmServerSocket?.accept()
-            Log.d(TAG,"RFCOM Server socket accepted connection")
 
-            if (socket != null)
-                connected(socket,mmDevice)
+            Log.d(TAG, "run: RFCOM server socket 1 start.....")
+            val socket1 = mmServerSocket1?.accept()
+            Log.d(TAG,"RFCOM Server socket 1 accepted connection")
+
+            Log.d(TAG, "run: RFCOM server socket 2 start.....")
+            val socket2 = mmServerSocket2?.accept()
+            Log.d(TAG,"RFCOM Server socket 2 accepted connection")
+
+            Log.d(TAG, "run: RFCOM server socket 3 start.....")
+            val socket3 = mmServerSocket3?.accept()
+            Log.d(TAG,"RFCOM Server socket accepted 3 connection")
+
+            if (socket1 != null)
+                connected(socket1, mmDevice)
+
+            if (socket2 != null)
+                connected(socket2, mmDevice)
+
+            if (socket3 != null)
+                connected(socket3, mmDevice)
         }
 
         fun cancel(){
             Log.d(TAG,"cancel: Cancelling AcceptThread")
-            mmServerSocket?.close()
+            mmServerSocket1?.close()
+            mmServerSocket2?.close()
+            mmServerSocket3?.close()
         }
     }
 
@@ -149,10 +187,11 @@ class BluetoothConnectionService (context: Context){
                     val incomingMessage = String(buffer,0,bytes)
                     Log.d(TAG,"InputStream: $incomingMessage")
 
-                    val incomingMessageIntent = Intent("incomingMessage")
-                    incomingMessageIntent.putExtra("theMessage", incomingMessage)
-                    mContext?.let {LocalBroadcastManager.getInstance(it).sendBroadcast(incomingMessageIntent)}
-                    Log.d(TAG,"Intent Broadcast Done")
+                    //Might have to add more intents when running multiple devices
+                        val incomingMessageIntentDevice1 = Intent("incomingMessageDevice1")
+                        incomingMessageIntentDevice1.putExtra("Device1Data", incomingMessage)
+                        mContext?.let {LocalBroadcastManager.getInstance(it).sendBroadcast(incomingMessageIntentDevice1)}
+                        Log.d(TAG, "Intent Broadcast Done")
 
                 } catch (e: IOException){
                     Log.e(TAG,"write: Error reading Input Stream. " + e.message)
@@ -189,9 +228,9 @@ class BluetoothConnectionService (context: Context){
         // Start the thread to manage the connection and perform transmissions
         mConnectedThread = ConnectedThread(mmSocket)
         mConnectedThread!!.start()
+
     }
 
-    //Public Method for external usage
     /**
      * Start the chat service. Specifically start AcceptThread to begin a
      * session in listening (server) mode. Called by the Activity onResume()
@@ -207,7 +246,7 @@ class BluetoothConnectionService (context: Context){
             mInsecureAcceptThread!!.start()
         }
     }
-
+    //Public Method for external usage
     /**
      * AcceptThread starts and sits waiting for a connection.
      * Then ConnectThread starts and attempts to make a connection with the other devices AcceptThread.

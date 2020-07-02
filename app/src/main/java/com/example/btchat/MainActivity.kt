@@ -1,10 +1,9 @@
 @file:Suppress("LocalVariableName", "UNUSED_PARAMETER", "unused",
-    "NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS"
+    "NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS", "PrivatePropertyName"
 )
 
 package com.example.btchat
 
-import SensorData
 import android.Manifest
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothAdapter.getDefaultAdapter
@@ -20,19 +19,23 @@ import android.hardware.SensorManager
 import android.os.Build
 import android.os.Build.VERSION_CODES.M
 import android.os.Bundle
+import android.os.Environment
 import android.util.Log
 import android.view.View
 import android.widget.*
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
+import java.io.FileOutputStream
 import java.nio.charset.Charset
 import java.util.*
 import kotlin.collections.ArrayList
 
 
 private const val TAG = "MyActivity"
-private val MY_UUID_INSECURE : UUID = UUID.fromString("8ce255c0-200a-11e0-ac64-0800200c9a66")
+private val MY_UUID_INSECURE_1 : UUID = UUID.fromString("8ce255c0-200a-11e0-ac64-0800200c9a66")
+private val MY_UUID_INSECURE_2 : UUID = UUID.fromString("a2eb3fca-4fe1-489a-935a-43599dd0eb59")
+private val MY_UUID_INSECURE_3 : UUID = UUID.fromString("03bf81b7-a613-459f-b76a-310265378bcf")
 
 const val  SamplingPeriod = 10000 //in Micro Seconds
 
@@ -41,32 +44,45 @@ class MainActivity : AppCompatActivity() , AdapterView.OnItemClickListener, Sens
 
     //Variables required to establish Bluetooth Communication
     private var mBluetoothAdapter   : BluetoothAdapter? = null
-    var mBluetoothConnection: BluetoothConnectionService? =null
-    var mBTDevice: BluetoothDevice? = null
-    var mBTDevices: ArrayList<BluetoothDevice?> = ArrayList()
 
-    var mDeviceListAdapter: DeviceListAdapter? = null
-    var lvNewDevices: ListView? = null
+    private var mBluetoothConnectionDevice1: BluetoothConnectionService? =null
+    private var mBluetoothConnectionDevice2: BluetoothConnectionService? =null
+    private var mBluetoothConnectionDevice3: BluetoothConnectionService? =null
 
-    var incomingMessages: TextView? =null   //This is for displaying the incoming messages on the screen
-    var messages: StringBuilder? = null //This is for appending the incoming messages and posting them on the text view
+    private var mBTDevice: BluetoothDevice? = null
+    private var mBTDevices: ArrayList<BluetoothDevice?> = ArrayList()
+
+    private var mDeviceListAdapter: DeviceListAdapter? = null
+    private var lvNewDevices: ListView? = null
+    //This is for displaying the incoming messages on the screen
+    private var incomingMessagesDevice1: TextView? =null
+    private var incomingMessagesDevice2: TextView? =null
+    private var incomingMessagesDevice3: TextView? =null
+
+    private var deviceID: Int = -2
 
     // Variables required for the Sensor data acquisition
-    private var mSensorData: SensorData? = null
-    var mSensorManager: SensorManager? = null
-    var mAccelerometer: Sensor? = null
-    var mGyroscope: Sensor? = null
+    private var mSensorManager: SensorManager? = null
+    private var mAccelerometer: Sensor? = null
+    private var mGyroscope: Sensor? = null
 
-    var x : Float = 0.0F
-    var y : Float = 0.0F
-    var z : Float = 0.0F
+    private var x : Float = 0.0F
+    private var y : Float = 0.0F
+    private var z : Float = 0.0F
 
-    var Wx : Float = 0.0F
-    var Wy : Float = 0.0F
-    var Wz : Float = 0.0F
+    private var Wx : Float = 0.0F
+    private var Wy : Float = 0.0F
+    private var Wz : Float = 0.0F
 
-    var dataFlow : Boolean = false
+    private var dataFlow : Boolean = false
 
+    private val CSV_HEADER = "X,Y,Z,Wx,Wy,Wz,\n"
+    private var out: FileOutputStream? = null
+    private val sensData1 = Environment.getExternalStorageDirectory().absolutePath +"/sensDataDevice1.csv"
+    private val sensData2 = Environment.getExternalStorageDirectory().absolutePath +"/sensDataDevice2.csv"
+  //  private val sensData3 = Environment.getExternalStorageDirectory().absolutePath +"/sensDataDevice3.csv"
+
+    var k = 0
 
     /**
      * The BroadCastReceivers are used to listen to the various state changes that happen
@@ -145,19 +161,56 @@ class MainActivity : AppCompatActivity() , AdapterView.OnItemClickListener, Sens
             }
         }
     }
-    //Listens for the incomingMessage and prints it in the textView
-    private val mReceiver: BroadcastReceiver = object: BroadcastReceiver(){
-        override fun onReceive(context: Context?, intent: Intent) {
 
-            val text: String = intent.getStringExtra("theMessage")
-            incomingMessages?.text = text
-            //messages?.append("$text \n")
-            //incomingMessages?.text = messages
+    //Listens for the incomingMessage and prints it in the textView
+    private val mReceiverDevice1: BroadcastReceiver = object: BroadcastReceiver(){
+        override fun onReceive(context: Context?, intent: Intent) {
+            val text: String = intent.getStringExtra("Device1Data")
+            incomingMessagesDevice1?.text = text
+            try {
+                out = openFileOutput(sensData1, Context.MODE_APPEND)
+                out?.write(text.toByteArray())
+                out?.write("\n".toByteArray())
+                out?.close()
+                Log.d(TAG,"Device1 data written to sensData.csv successfully")
+            }catch (e: Exception) {
+                Log.d(TAG, "error in writing Accel to sensData.csv")
+            }
         }
     }
 
-
-
+    private val mReceiverDevice2: BroadcastReceiver = object: BroadcastReceiver(){
+        override fun onReceive(context: Context?, intent: Intent) {
+            val text: String = intent.getStringExtra("Device2Data")
+            incomingMessagesDevice2?.text = text
+            try {
+                out = openFileOutput(sensData2, Context.MODE_APPEND)
+                out?.write(text.toByteArray())
+                out?.write("\n".toByteArray())
+                out?.close()
+                Log.d(TAG,"Device 2 data written to sensData.csv successfully")
+            }catch (e: Exception) {
+                Log.d(TAG, "error in writing Gyro to sensData.csv")
+            }
+        }
+    }
+/*
+    private val mReceiverDevice3: BroadcastReceiver = object: BroadcastReceiver(){
+        override fun onReceive(context: Context?, intent: Intent) {
+            val text: String = intent.getStringExtra("Device3Data")
+            incomingMessagesDevice3?.text = text
+            try {
+                out = openFileOutput(sensData2, Context.MODE_APPEND)
+                out?.write(text.toByteArray())
+                out?.write("\n".toByteArray())
+                out?.close()
+                Log.d(TAG,"Device 2 data written to sensData.csv successfully")
+            }catch (e: Exception) {
+                Log.d(TAG, "error in writing Gyro to sensData.csv")
+            }
+        }
+    }
+*/
     /**
      * The OnCreate and OnDestroy methods are the methods that will be executed on the creation of
      * the activity and the destruction of the activity respectively
@@ -168,30 +221,53 @@ class MainActivity : AppCompatActivity() , AdapterView.OnItemClickListener, Sens
 
         val btnONOFF : Button = this.findViewById(R.id.btnONOFF)
         val btnStartConnection: Button = this.findViewById(R.id.btnStartConnection)
-        val btnSend: Button = this.findViewById(R.id.btnSend)
 
         val btnStartSensors: Button = this.findViewById(R.id.btnStartSensors)
         val btnStopSensors: Button = this.findViewById(R.id.btnStopSensors)
 
-        val etSend: EditText = this.findViewById(R.id.editText)
 
         lvNewDevices = findViewById(R.id.lvNewDevices)
         mBTDevices = ArrayList()
 
-        incomingMessages = findViewById(R.id.incomingMessages)
-        messages = StringBuilder()
+        incomingMessagesDevice1 = findViewById(R.id.incomingMessagesDevice1)
+        incomingMessagesDevice2 = findViewById(R.id.incomingMessagesDevice2)
+    //    incomingMessagesDevice3 = findViewById(R.id.incomingMessagesDevice3)
 
-        LocalBroadcastManager.getInstance(this).registerReceiver(mReceiver, IntentFilter("incomingMessage"))
+        LocalBroadcastManager.getInstance(this).registerReceiver(mReceiverDevice1, IntentFilter("incomingMessageDevice1"))
+        LocalBroadcastManager.getInstance(this).registerReceiver(mReceiverDevice2, IntentFilter("incomingMessageDevice2"))
+       // LocalBroadcastManager.getInstance(this).registerReceiver(mReceiverDevice3, IntentFilter("incomingMessageDevice3"))
+
         val filter = IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED)
         registerReceiver(mBroadcastReceiver4,filter)
 
         this.mBluetoothAdapter = getDefaultAdapter()
         lvNewDevices!!.onItemClickListener = this@MainActivity
 
-
         mSensorManager = this@MainActivity.getSystemService(Context.SENSOR_SERVICE) as SensorManager
         mAccelerometer = mSensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
         mGyroscope = mSensorManager?.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
+
+
+
+        try {
+            out = openFileOutput(sensData1, Context.MODE_APPEND)
+            out?.write(CSV_HEADER.toByteArray())
+            out?.close()
+            Log.d(TAG,"OnCreate: sensDataDevice1.csv created successfully")
+            /*
+            out = openFileOutput(sensData2, Context.MODE_APPEND)
+            out?.write(CSV_HEADER.toByteArray())
+            out?.close()
+            Log.d(TAG,"OnCreate: sensDataDevice2.csv created successfully")
+
+            out = openFileOutput(sensData3, Context.MODE_APPEND)
+            out?.write(CSV_HEADER.toByteArray())
+            out?.close()
+            Log.d(TAG,"OnCreate: sensDataDevice3.csv created successfully")
+            */
+        }catch (e: Exception) {
+            Log.d(TAG, "OnCreate: error in creating sensData.csv")
+        }
 
 
         btnONOFF.setOnClickListener(){
@@ -200,12 +276,6 @@ class MainActivity : AppCompatActivity() , AdapterView.OnItemClickListener, Sens
 
         btnStartConnection.setOnClickListener(){
                 startConnection()
-        }
-
-        btnSend.setOnClickListener(){
-                val bytes: ByteArray = etSend.text.toString().toByteArray(Charset.defaultCharset())
-                mBluetoothConnection?.write(bytes)
-                etSend.setText("")
         }
 
         btnStartSensors.setOnClickListener(){
@@ -232,7 +302,9 @@ class MainActivity : AppCompatActivity() , AdapterView.OnItemClickListener, Sens
         this.unregisterReceiver(this.mBroadcastReceiver2)
         this.unregisterReceiver(this.mBroadcastReceiver3)
         this.unregisterReceiver(this.mBroadcastReceiver4)
-        this.unregisterReceiver(this.mReceiver)
+        this.unregisterReceiver(this.mReceiverDevice1)
+        this.unregisterReceiver(this.mReceiverDevice2)
+     //   this.unregisterReceiver(this.mReceiverDevice3)
         destListeners()
     }
 
@@ -248,8 +320,6 @@ class MainActivity : AppCompatActivity() , AdapterView.OnItemClickListener, Sens
         destListeners()
     }
 
-
-
     override fun onSensorChanged(event: SensorEvent) {
         Log.d(TAG, "onSensorChanged: Started")
         when (event.sensor.type) {
@@ -258,24 +328,62 @@ class MainActivity : AppCompatActivity() , AdapterView.OnItemClickListener, Sens
                 y = event.values[1]
                 z = event.values[2]
             }
-            Sensor.TYPE_GYROSCOPE ->     {
-                                            Wx = event.values[0]
-                                            Wy = event.values[1]
-                                            Wz = event.values[2]
-                                         }
+            Sensor.TYPE_GYROSCOPE -> {
+                Wx = event.values[0]
+                Wy = event.values[1]
+                Wz = event.values[2]
+            }
         }
         if (dataFlow)
         {
-            val data = "X=$x\t Y=$y\t Z=$z\t Wx=$Wx\t Wy=$Wy\t Wz=$Wz\n"
+            val data = "$x,$y,$z,$Wx,$Wy,$Wz,\n"
             Log.d(TAG, "onSensorChanged: Data: $data")
             val byte : ByteArray = data.toByteArray(Charset.defaultCharset())
-            mBluetoothConnection?.write(byte)
+            if (deviceID == 1)
+                mBluetoothConnectionDevice1?.write(byte)
+           // if (deviceID == 2)
+           //     mBluetoothConnectionDevice2?.write(byte)
+         //   if (deviceID == 3)
+          //      mBluetoothConnectionDevice3?.write(byte)
+
             Log.d(TAG, "onSensorChanged: Data Transmitted")
+
+            try {
+                out = openFileOutput(sensData1, Context.MODE_APPEND)
+                out?.write(byte)
+                out?.close()
+                Log.d(TAG,"OnSensorChanged: Data written to file")
+            }catch (e: Exception) {
+                Log.d(TAG, "OnSensorChanged: error in opening sensData.csv")
+            }
         }
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
         Log.d(TAG, "Accuracy Changed")
+    }
+
+    fun onRadioButtonClicked(view: View) {
+        if (view is RadioButton) {
+            // Is the button now checked?
+            val checked = view.isChecked
+
+            // Check which radio button was clicked
+            when (view.getId()) {
+                R.id.radio_receiver ->      if (checked) {
+                    deviceID = 0        //Receiver
+                }
+                R.id.radio_transmitter1 ->  if (checked) {
+                    deviceID = 1        //Tx1
+                }
+                R.id.radio_transmitter2 ->  if (checked) {
+                    deviceID = 2        //Tx2
+                }
+                R.id.radio_transmitter3 ->  if (checked) {
+                    deviceID = 3        //Tx3
+                }
+            }
+        }
     }
 
     /**
@@ -304,7 +412,6 @@ class MainActivity : AppCompatActivity() , AdapterView.OnItemClickListener, Sens
             this.registerReceiver(this.mBroadcastReceiver1, BTIntent)
         }
     }
-
     //Used to make the device discoverable to other devices for 300 seconds
     fun btnEnableDisableDiscoverable(view: View) {
         Log.d(TAG,"btnEnableDisableDiscoverable: Making device discoverable for 300 seconds.")
@@ -314,7 +421,6 @@ class MainActivity : AppCompatActivity() , AdapterView.OnItemClickListener, Sens
         val intentFilter = IntentFilter(BluetoothAdapter.ACTION_SCAN_MODE_CHANGED)
         registerReceiver(mBroadcastReceiver2, intentFilter)
     }
-
     //Used to Scan and Discover other discoverable devices
     fun btnDiscover(view: View) {
         Log.d(TAG, "btnDiscover: Looking for unpaired devices.")
@@ -342,21 +448,23 @@ class MainActivity : AppCompatActivity() , AdapterView.OnItemClickListener, Sens
             registerReceiver(mBroadcastReceiver3, discoverDevicesIntent)
         }
     }
-
-    //Remember the connection will fail and app will crash if you haven't paired first
+    //Remember, the connection will fail and app will crash if you haven't paired first
     private fun startConnection(){
-        startBTConnection(this.mBTDevice, MY_UUID_INSECURE)
+        startBTConnection(this.mBTDevice, MY_UUID_INSECURE_1, MY_UUID_INSECURE_2, MY_UUID_INSECURE_3)
     }
     //Starting chat service method and initializing the Listeners for Sensors
-    private fun startBTConnection(device: BluetoothDevice?, uuid: UUID?) {
+    private fun startBTConnection(device: BluetoothDevice?, uuid1: UUID?, uuid2: UUID?, uuid3: UUID?){
         Log.d(TAG,"startBTConnection: Initializing RFCOM Bluetooth Connection.")
-        mBluetoothConnection?.startClient(device, uuid)
+        mBluetoothConnectionDevice1?.startClient(device, uuid1)
+       // mBluetoothConnectionDevice2?.startClient(device, uuid2)
+       // mBluetoothConnectionDevice3?.startClient(device, uuid3)
     }
 
     //Used to initiate a bond with the device that has been selected in the DeviceListAdapter
     override fun onItemClick(adapterView: AdapterView<*>?, view: View, i: Int, l: Long) {
         //first cancel discovery because its very memory intensive.
         mBluetoothAdapter!!.cancelDiscovery()
+
 
         Log.d(TAG, "onItemClick: You Clicked on a device.")
         val deviceName = mBTDevices[i]!!.name
@@ -365,12 +473,33 @@ class MainActivity : AppCompatActivity() , AdapterView.OnItemClickListener, Sens
         Log.d(TAG, "onItemClick: deviceName = $deviceName")
         Log.d(TAG, "onItemClick: deviceAddress = $deviceAddress")
 
-        //create the bond.
+        //create the bond i.e. pair the devices.
         Log.d(TAG, "Trying to pair with $deviceName")
         mBTDevice = mBTDevices[i]
         mBTDevice?.createBond()
         Log.d(TAG, "Bond Created")
-        mBluetoothConnection = BluetoothConnectionService(this@MainActivity)
+        when (deviceID) {
+            0 -> {
+                //K is used to count the number of times onItemClick is run on a receiver to
+                // ensure the correct object is created with the correct uuid for the selected device
+                if (k == 0)
+                    mBluetoothConnectionDevice1 =
+                        BluetoothConnectionService(this@MainActivity, deviceID, MY_UUID_INSECURE_1)
+                //if (k == 1)
+                //    mBluetoothConnectionDevice2 =
+                //        BluetoothConnectionService(this@MainActivity, deviceID, MY_UUID_INSECURE_2)
+                //  if(k == 2)
+                //    mBluetoothConnectionDevice3 =
+                //        BluetoothConnectionService(this@MainActivity, deviceID, MY_UUID_INSECURE_3)
+                k += 1
+            }
+            1 -> mBluetoothConnectionDevice1 =
+                BluetoothConnectionService(this@MainActivity, deviceID, MY_UUID_INSECURE_1)
+            2 -> mBluetoothConnectionDevice2 =
+                BluetoothConnectionService(this@MainActivity, deviceID, MY_UUID_INSECURE_2)
+            3 -> mBluetoothConnectionDevice3 =
+                BluetoothConnectionService(this@MainActivity, deviceID, MY_UUID_INSECURE_3)
+        }
     }
 
     //Used to check if all the Permissions needed for the application to run smoothly is available
@@ -390,13 +519,14 @@ class MainActivity : AppCompatActivity() , AdapterView.OnItemClickListener, Sens
     /**
      * Sensor Methods
      */
-
-    private fun initListeners(){
-        mSensorManager?.registerListener(this, mAccelerometer, SensorManager.SENSOR_DELAY_NORMAL) //100Hz sampling rate
-        mSensorManager?.registerListener(this, mGyroscope, SensorManager.SENSOR_DELAY_NORMAL)
+     private fun initListeners(){
+        //SamplingPeriod defines the rate at which the sensor is polled
+        mSensorManager?.registerListener(this, mAccelerometer, SamplingPeriod)
+        mSensorManager?.registerListener(this, mGyroscope, SamplingPeriod)
     }
 
-    private fun destListeners(){
+     private fun destListeners(){
         mSensorManager?.unregisterListener(this)
     }
+
 }
