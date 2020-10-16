@@ -10,3 +10,5 @@ The Procedure to use the application to send and receive messages:
 7. Click  the Start Connection button on one device
 8. Use the Start/Stop Sensors buttons to start/stop the transmission of data
 
+Demo: https://drive.google.com/file/d/1g4W4k_ldGKjOxZH7NhyPfcjPJD7qvtyd/view?usp=sharing
+Screenshots: https://drive.google.com/file/d/1S0kh9v_gYXUNhyBxUdWaYHwPRY7VItU4/view?usp=sharing
